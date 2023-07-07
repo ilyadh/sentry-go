@@ -44,15 +44,18 @@ func New(options Options) echo.MiddlewareFunc {
 }
 
 func (h *handler) handle(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(ctx echo.Context) error {
-		hub := sentry.GetHubFromContext(ctx.Request().Context())
+	return func(c echo.Context) error {
+		ctx := c.Request().Context()
+		hub := sentry.GetHubFromContext(ctx)
 		if hub == nil {
 			hub = sentry.CurrentHub().Clone()
+			ctx = sentry.SetHubOnContext(ctx, hub)
 		}
-		hub.Scope().SetRequest(ctx.Request())
-		ctx.Set(valuesKey, hub)
-		defer h.recoverWithSentry(hub, ctx.Request())
-		return next(ctx)
+		c.SetRequest(c.Request().WithContext(ctx))
+		hub.Scope().SetRequest(c.Request())
+		c.Set(valuesKey, hub)
+		defer h.recoverWithSentry(hub, c.Request())
+		return next(c)
 	}
 }
 
